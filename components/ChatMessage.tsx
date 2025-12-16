@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Message, MessageSender } from '../types';
 import MathRenderer from './MathRenderer';
 import { Bot, User } from 'lucide-react';
@@ -9,6 +9,12 @@ interface ChatMessageProps {
 
 const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.sender === MessageSender.USER;
+
+  // Memoize timestamp formatting (avoid re-computing on every render)
+  const formattedTime = useMemo(() => 
+    message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    [message.timestamp]
+  );
 
   return (
     <div className={`flex w-full mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -28,7 +34,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       >
         <MathRenderer text={message.text} />
         <div className={`text-[10px] mt-1 ${isUser ? 'text-indigo-200' : 'text-gray-400'}`}>
-          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {formattedTime}
         </div>
       </div>
 
@@ -41,4 +47,5 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   );
 };
 
-export default ChatMessage;
+// Memoize to prevent re-renders when message hasn't changed
+export default React.memo(ChatMessage);
