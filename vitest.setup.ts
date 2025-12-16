@@ -32,3 +32,6 @@ global.IntersectionObserver = class IntersectionObserver {
   }
   unobserve() {}
 } as any;
+
+// Mock scrollIntoView
+Element.prototype.scrollIntoView = () => {};
