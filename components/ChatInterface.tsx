@@ -24,6 +24,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ isOpen, onClose, isMobile
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Use ref to store current input text to avoid recreating callbacks
+  const inputTextRef = useRef('');
+  
+  useEffect(() => {
+    inputTextRef.current = inputText;
+  }, [inputText]);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -50,7 +57,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ isOpen, onClose, isMobile
     }
   }, [isOpen, isMobile]);
 
-  const addMessage = (text: string, sender: MessageSender) => {
+  // Memoize addMessage to prevent recreating on every render
+  const addMessage = useCallback((text: string, sender: MessageSender) => {
     const newMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -58,24 +66,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ isOpen, onClose, isMobile
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, newMessage]);
-  };
+  }, []);
 
   // Memoize callbacks to prevent unnecessary re-renders of child components
-  const handleSendMessage = useCallback(async (text: string = inputText) => {
-    if (!text.trim() || isTyping) return;
+  // Use ref to access current inputText without adding it to dependencies
+  const handleSendMessage = useCallback(async (text?: string) => {
+    const messageText = text !== undefined ? text : inputTextRef.current;
+    
+    if (!messageText.trim()) return;
 
     // 1. Add User Message
-    addMessage(text, MessageSender.USER);
+    addMessage(messageText, MessageSender.USER);
     setInputText('');
     setIsTyping(true);
 
     // 2. Simulate thinking delay (~1.5 seconds) and get smart response
     setTimeout(() => {
-      const aiResponse = getAIResponse(text);
+      const aiResponse = getAIResponse(messageText);
       setIsTyping(false);
       addMessage(aiResponse, MessageSender.AI);
     }, 1500);
-  }, [inputText, isTyping]);
+  }, [addMessage]);
 
   const handleInputChange = useCallback((text: string) => {
     setInputText(text);

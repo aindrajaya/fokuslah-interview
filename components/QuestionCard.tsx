@@ -1,34 +1,41 @@
 import React, { useState } from 'react';
 import MathRenderer from './MathRenderer';
 import { BookOpen } from 'lucide-react';
-import { SAMPLE_QUESTION } from '../constants';
+import { QUESTION_DATA } from '../constants';
+
+// Transform raw text to LaTeX format ONCE outside component
+// This prevents recalculation on every render
+const FORMATTED_TEXT = QUESTION_DATA.raw_text
+  .replace("the number 0.00000000031", "$0.00000000031$")
+  .replace("'plus-minus a times 10 to the power of n'", "$\\pm a \\times 10^n$")
+  .replace("1 is less than or equal to a which is less than 10", "$1 \\leq |a| < 10$")
+  .replace(" and n is", " and $n$ is");
 
 const QuestionCard: React.FC = () => {
+  console.log('🔵 QuestionCard rendered at', new Date().toISOString());
   const [answer, setAnswer] = useState('');
 
   return (
     <div className="max-w-3xl mx-auto p-6 md:p-10 flex flex-col h-full overflow-y-auto">
       {/* Header Tags */}
       <div className="flex items-center gap-3 mb-6">
-        {SAMPLE_QUESTION.subject && (
-          <div className="flex items-center gap-2">
-            <BookOpen size={20} className="text-indigo-600" />
-            <span className="text-sm font-medium text-gray-600">{SAMPLE_QUESTION.subject}</span>
-          </div>
-        )}
-        {SAMPLE_QUESTION.difficulty && (
+        <div className="flex items-center gap-2">
+          <BookOpen size={20} className="text-indigo-600" />
+          <span className="text-sm font-medium text-gray-600">Mathematics</span>
+        </div>
+        {QUESTION_DATA.difficulty && (
           <span className={`
             px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md
-            ${SAMPLE_QUESTION.difficulty === 'Easy' ? 'bg-green-50 text-green-700' : ''}
-            ${SAMPLE_QUESTION.difficulty === 'Medium' ? 'bg-yellow-50 text-yellow-700' : ''}
-            ${SAMPLE_QUESTION.difficulty === 'Hard' ? 'bg-red-50 text-red-700' : ''}
+            ${QUESTION_DATA.difficulty === 'Easy' ? 'bg-green-50 text-green-700' : ''}
+            ${QUESTION_DATA.difficulty === 'Medium' ? 'bg-yellow-50 text-yellow-700' : ''}
+            ${QUESTION_DATA.difficulty === 'Hard' ? 'bg-red-50 text-red-700' : ''}
           `}>
-            {SAMPLE_QUESTION.difficulty}
+            {QUESTION_DATA.difficulty}
           </span>
         )}
-        {SAMPLE_QUESTION.topic && (
+        {QUESTION_DATA.topic && (
           <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider rounded-md">
-            {SAMPLE_QUESTION.topic}
+            {QUESTION_DATA.topic}
           </span>
         )}
       </div>
@@ -36,7 +43,7 @@ const QuestionCard: React.FC = () => {
       {/* Question Body */}
       <div className="mb-8">
         <h1 className="text-xl md:text-2xl font-serif text-gray-900 leading-relaxed">
-          <MathRenderer text={SAMPLE_QUESTION.text} />
+          <MathRenderer text={FORMATTED_TEXT} />
         </h1>
       </div>
 
@@ -67,12 +74,20 @@ const QuestionCard: React.FC = () => {
 
       <div className="mt-auto pt-10 text-center md:text-left">
         <div className="text-sm text-gray-400">
-          Question ID: <span className="font-mono text-gray-500">{SAMPLE_QUESTION.id}</span>
+          Question ID: <span className="font-mono text-gray-500">{QUESTION_DATA.id}</span>
         </div>
       </div>
     </div>
   );
 };
 
-// Memoize to prevent unnecessary re-renders when parent state changes
-export default React.memo(QuestionCard);
+QuestionCard.displayName = 'QuestionCard';
+
+// Memoize with explicit comparison function that ALWAYS returns true (never re-render)
+// This is for testing - if it still re-renders, React.memo is being bypassed somehow
+const MemoizedQuestionCard = React.memo(QuestionCard, () => {
+  console.log('🔴 QuestionCard memo comparison called - returning true (should NOT re-render)');
+  return true; // Always return true = props are always equal = never re-render
+});
+
+export default MemoizedQuestionCard;
