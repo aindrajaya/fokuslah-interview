@@ -27,7 +27,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ isOpen, onClose, isMobile
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      // Scroll with a slight delay to ensure DOM is updated
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'end',
+          inline: 'nearest'
+        });
+      });
+    }
   };
 
   useEffect(() => {
