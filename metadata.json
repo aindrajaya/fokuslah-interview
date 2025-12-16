@@ -1,0 +1,5 @@
+{
+  "name": "Smart Tutor Exam Interface",
+  "description": "A responsive exam mode interface with an integrated AI helper (Jojo), featuring LaTeX math rendering and a simulated chat experience.",
+  "requestFramePermissions": []
+}
