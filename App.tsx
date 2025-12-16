@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { MessageCircle } from 'lucide-react';
-import { QUESTION_DATA } from './constants';
 import QuestionCard from './components/QuestionCard';
-import ChatInterface from './components/ChatInterface';
+
+// Lazy load ChatInterface to reduce initial bundle size
+const ChatInterface = lazy(() => import('./components/ChatInterface'));
 
 const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -21,16 +22,20 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handleChatOpen = useCallback(() => setIsChatOpen(true), []);
+  const handleChatClose = useCallback(() => setIsChatOpen(false), []);
+
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 overflow-hidden flex flex-col md:flex-row">
+    <div className={`h-screen bg-white font-sans text-slate-900 flex flex-col md:flex-row ${isMobile && isChatOpen ? 'overflow-hidden' : ''}`}>
       
       {/* 
         SECTION 1: Question Area (Main Stage)
         Desktop: Takes 60% width
         Mobile: Takes full width
       */}
-      <main className="flex-1 md:flex-[0.6] h-screen relative z-0">
-        <QuestionCard data={QUESTION_DATA} />
+      <main className={`flex-1 md:flex-[0.6] h-screen relative z-0 ${isMobile && isChatOpen ? 'overflow-hidden' : ''}`}>
+        <QuestionCard />
       </main>
 
       {/* 
@@ -43,18 +48,21 @@ const App: React.FC = () => {
           {/* Mobile Overlay/Drawer */}
           <div 
              className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${isChatOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-             onClick={() => setIsChatOpen(false)}
+             onClick={handleChatClose}
+             style={{ touchAction: 'none' }}
           />
-          <ChatInterface 
-            isOpen={isChatOpen} 
-            onClose={() => setIsChatOpen(false)} 
-            isMobile={true} 
-          />
+          <Suspense fallback={<div className="fixed bottom-0 left-0 right-0 h-[85vh] bg-gray-50 rounded-t-3xl z-50 flex items-center justify-center">Loading...</div>}>
+            <ChatInterface 
+              isOpen={isChatOpen} 
+              onClose={handleChatClose} 
+              isMobile={true} 
+            />
+          </Suspense>
           
           {/* FAB - Floating Action Button */}
           {!isChatOpen && (
             <button
-              onClick={() => setIsChatOpen(true)}
+              onClick={handleChatOpen}
               className="fixed bottom-6 right-6 z-30 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg rounded-full px-5 py-3 flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
             >
               <MessageCircle size={20} />
@@ -65,11 +73,13 @@ const App: React.FC = () => {
       ) : (
         /* Desktop Split View */
         <aside className="md:flex-[0.4] h-screen border-l border-gray-200 shadow-xl z-10">
-          <ChatInterface 
-            isOpen={true} 
-            onClose={() => {}} 
-            isMobile={false} 
-          />
+          <Suspense fallback={<div className="flex items-center justify-center h-full">Loading chat...</div>}>
+            <ChatInterface 
+              isOpen={true} 
+              onClose={() => {}} 
+              isMobile={false} 
+            />
+          </Suspense>
         </aside>
       )}
 
