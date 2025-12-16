@@ -18,6 +18,29 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        // Optimize chunk splitting for better caching and parallel loading
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              // Split vendor code into separate chunks
+              'react-vendor': ['react', 'react-dom'],
+              'katex-vendor': ['react-katex'],
+              'icons-vendor': ['lucide-react'],
+            },
+          },
+        },
+        // Enable minification for smaller bundles
+        minify: 'terser',
+        terserOptions: {
+          compress: {
+            drop_console: true, // Remove console.logs in production
+            drop_debugger: true,
+          },
+        },
+        // Increase chunk size warning limit
+        chunkSizeWarningLimit: 600,
+      },
     };
 });

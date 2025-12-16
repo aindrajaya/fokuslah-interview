@@ -4,10 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Smart Tutor - Fokuslah</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- KaTeX CSS for math rendering -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    
+    <!-- Preload critical fonts to avoid FOIT (Flash of Invisible Text) -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+    
+    <!-- Inline critical CSS for instant rendering -->
     <style>
+      /* Critical styles for initial render */
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      #root {
+        min-height: 100vh;
+      }
       /* Custom scrollbar for chat */
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -17,6 +30,14 @@
           scrollbar-width: none;
       }
     </style>
+    
+    <!-- Defer non-critical Tailwind CSS to unblock rendering -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    
+    <!-- Load KaTeX CSS asynchronously with font-display: swap -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"></noscript>
+    
   <script type="importmap">
 {
   "imports": {
@@ -24,7 +45,9 @@
     "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "katex": "https://esm.sh/katex@^0.16.27"
+    "react-katex": "https://esm.sh/react-katex@^4.0.0",
+    "katex": "https://esm.sh/katex@^0.16.27",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0"
   }
 }
 </script>

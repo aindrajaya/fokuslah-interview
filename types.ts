@@ -6,9 +6,19 @@ export interface QuestionData {
   answer_type: string;
 }
 
+export interface Question {
+  id: string;
+  text: string;
+  subject?: string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  topic?: string;
+}
+
 export interface MockAIResponse {
   hint: string;
   steps: string;
+  explain?: string;
+  default?: string;
 }
 
 export enum MessageSender {
