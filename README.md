@@ -138,64 +138,156 @@ transition: 'transform 300ms ease-out'
 - **MathRenderer.tsx:** LaTeX parsing and rendering using react-katex
 - **ChatMessage.tsx:** Message bubble styling and formatting
 
-### 6. Performance Optimizations (Co-location Approach)
-Following the principle of **"state in the right place"** to prevent unnecessary re-renders:
+### 6. Performance Optimizations (Steve Kinney's React Performance Principles)
 
-**State Co-location Strategy:**
-- ✅ **QuestionCard state (`answer`)** - Local to QuestionCard, never affects chat
-- ✅ **Chat state (`messages`, `inputText`, `isTyping`)** - Local to ChatInterface, never affects question
-- ✅ **Layout state (`isChatOpen`, `isMobile`)** - In App.tsx where layout decisions are made
+Following Steve Kinney's principle of **"not doing stuff is faster than doing stuff"** and **"put state in the right place so it's not triggering stuff in parts of the tree that don't care"**.
 
-**React.memo Optimizations:**
-- ✅ `QuestionCard` - Memoized to prevent re-renders when chat opens/closes
-- ✅ `ChatHeader` - Only re-renders if isMobile or onClose changes
-- ✅ `ChatMessages` - Only re-renders when messages array or isTyping changes
-- ✅ `ChatInput` - Only re-renders when inputText, isTyping, or showQuickActions changes
-- ✅ `ChatMessage` - Only re-renders when message content or timestamp changes
-- ✅ `MathRenderer` - Only re-renders when text or block prop changes
+#### The Problem: QuestionCard Re-rendering
 
-**useCallback Optimizations:**
-- ✅ Event handlers in App (`handleChatOpen`, `handleChatClose`)
-- ✅ Message handlers in ChatInterface (`handleSendMessage`, `handleInputChange`, `handleKeyPress`)
+During development, we identified that `QuestionCard (Memo)` was re-rendering on every chat interaction (user input, AI response), even though:
+- It had no props
+- It was wrapped in `React.memo()`
+- It had no dependencies on chat state
 
-**useMemo Optimizations:**
-- ✅ `MathRenderer` - Memoizes LaTeX parsing logic (split by $ delimiters)
-  - Prevents expensive text.split('$') on every render
-  - Pre-selects MathComponent (InlineMath/BlockMath) outside map loop
-  - Filters empty parts to reduce DOM nodes
-- ✅ `ChatMessage` - Memoizes timestamp formatting (toLocaleTimeString is expensive)
+**Flame graph analysis showed:**
+- `QuestionCard (Memo)` appeared in every single commit (1/15 to 14/15)
+- Consistent render duration of ~1.2ms per commit
+- Re-renders triggered by `ChatInterface` state changes
 
-**Math Rendering Performance:**
-The MathRenderer component was identified as a bottleneck (3.6ms of 22.7ms initial render):
+#### Root Cause Analysis
+
+Standard `React.memo()` was failing because:
+1. **Parent re-renders propagate down** - Even with no props changing, React still calls the comparison function
+2. **Default shallow comparison** - The default comparison function was being called but the component still re-rendered
+3. **React's reconciliation** - React was still traversing the component tree
+
+#### The Solution: Custom Comparison Function with Always-True Return
+
+We applied a **strict memoization strategy** using a custom comparison function that always returns `true`, effectively telling React "the props are always equal, never re-render":
+
 ```typescript
-// Optimized parsing with useMemo
-const renderedContent = useMemo(() => {
-  const parts = text.split('$');
-  const MathComponent = block ? BlockMath : InlineMath;
-  
-  return parts.map((part, index) => {
-    if (index % 2 === 1) {
-      if (!part.trim()) return null;
-      try {
-        return <MathComponent key={index} math={part} />;
-      } catch (e) {
-        return <span key={index}>{part}</span>;
-      }
-    } else {
-      if (!part) return null;
-      return <span key={index}>{part}</span>;
-    }
-  });
-}, [text, block]);
+// In QuestionCard.tsx
+const MemoizedQuestionCard = React.memo(QuestionCard, () => {
+  console.log('🔴 QuestionCard memo comparison called - returning true (should NOT re-render)');
+  return true; // Always return true = props are always equal = never re-render
+});
+
+export default MemoizedQuestionCard;
 ```
 
-**Performance Metrics:**
-- Initial render reduced from 22.7ms baseline
-- MathComponent render time optimized (was 3.6ms, 16% of total render)
-- Bundle size: 482.83 kB → 145.52 kB gzipped
-- Build time: ~2.2 seconds
+**Why this works:**
+- `React.memo(Component, compareFunction)` accepts a custom comparison function
+- When `compareFunction` returns `true`, it means "prev props === next props"
+- React skips re-rendering the component entirely
+- Since `QuestionCard` has no props that need to change from parent, this is safe
 
-**Result:** Changes in chat state don't trigger re-renders in QuestionCard, and vice versa. The component tree re-renders only the minimal necessary portions. Math rendering is cached and only re-parsed when content actually changes.
+#### Additional Optimizations Applied
+
+**1. State Collocation (Chat state isolated in ChatContainer)**
+```typescript
+// ChatContainer.tsx - All chat state isolated here
+const ChatContainer: React.FC = () => {
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  // ... all chat-related state
+}
+
+// App.tsx - Pure layout component with NO state
+const App: React.FC = () => {
+  const layout = useMemo(() => (
+    <div className={STATIC_CONTAINER_CLASS}>
+      <QuestionCard />
+      <ChatContainer />
+    </div>
+  ), []); // Empty deps - layout never changes
+  
+  return layout;
+}
+```
+
+**2. Stable Callback References (useCallback for all handlers)**
+```typescript
+// ChatContainer.tsx
+const handleChatOpen = useCallback(() => setIsChatOpen(true), []);
+const handleChatClose = useCallback(() => setIsChatOpen(false), []);
+const emptyCallback = useCallback(() => {}, []); // Stable reference for desktop
+
+// ChatInterface.tsx - Using refs to avoid stale closures
+const inputTextRef = useRef('');
+useEffect(() => { inputTextRef.current = inputText; }, [inputText]);
+
+const handleSendMessage = useCallback(async () => {
+  const messageText = inputTextRef.current; // Read from ref, not state
+  // ... send message logic
+}, [addMessage]); // Minimal dependencies
+```
+
+**3. Module-Level Constants (Calculations outside component)**
+```typescript
+// QuestionCard.tsx - Calculate ONCE at module load
+const FORMATTED_TEXT = QUESTION_DATA.raw_text
+  .replace("the number 0.00000000031", "$0.00000000031$")
+  .replace("'plus-minus a times 10 to the power of n'", "$\\pm a \\times 10^n$")
+  // ... more replacements
+```
+
+**4. Memoized Layout Structure**
+```typescript
+// App.tsx
+const STATIC_MAIN_CLASS = "flex-1 md:flex-[0.6] h-screen relative z-0";
+const STATIC_CONTAINER_CLASS = "h-screen bg-white font-sans text-slate-900 flex flex-col md:flex-row";
+
+const layout = useMemo(() => (
+  <div className={STATIC_CONTAINER_CLASS}>
+    <main className={STATIC_MAIN_CLASS}>
+      <QuestionCard key="question-card" />
+    </main>
+    <ChatContainer key="chat-container" />
+  </div>
+), []); // Render once, cache forever
+```
+
+#### React.memo Optimizations Summary
+
+| Component | Strategy | Result |
+|-----------|----------|--------|
+| `QuestionCard` | Custom comparison `() => true` | Never re-renders from chat |
+| `ChatContainer` | `React.memo()` + no props | Only re-renders from own state |
+| `ChatHeader` | `React.memo()` + stable props | Minimal re-renders |
+| `ChatMessages` | `React.memo()` + stable props | Only on message changes |
+| `ChatInput` | `React.memo()` + stable props | Only on input changes |
+| `MathRenderer` | `React.memo()` + custom comparison | Only on text/block changes |
+
+#### Performance Result
+
+**Before optimization:**
+- `QuestionCard` appeared in 14/15 flame graph commits
+- Re-rendered on every chat interaction
+- ~1.2ms wasted per chat state change
+
+**After optimization:**
+- `QuestionCard` only renders on initial mount
+- Never re-renders from chat state changes
+- Only re-renders when user types in answer input (expected behavior)
+
+#### Key Principles Applied (Steve Kinney's Course)
+
+1. **"Not doing stuff is faster than doing stuff"** (0:00:32)
+   - Moved calculations outside components
+   - Used custom memo comparison to skip re-renders entirely
+
+2. **"Start the change at a lower portion of the tree"** (0:04:52)
+   - Moved all chat state from `App` to `ChatContainer`
+   - QuestionCard's parent never re-renders
+
+3. **"Put state in the right place"** (0:07:06)
+   - Chat state → ChatContainer/ChatInterface
+   - Answer state → QuestionCard
+   - No shared parent state
+
+4. **"Check if inputs are the same, don't do all the work"** (0:07:12)
+   - Custom `React.memo()` comparison function
+   - Always returns true for components with no meaningful prop changes
 
 ## Assumptions & Simplifications
 
