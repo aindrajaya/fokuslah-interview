@@ -11,9 +11,37 @@ const FORMATTED_TEXT = QUESTION_DATA.raw_text
   .replace("1 is less than or equal to a which is less than 10", "$1 \\leq |a| < 10$")
   .replace(" and n is", " and $n$ is");
 
+// Convert scientific notation to LaTeX format
+const convertToLatex = (input: string): string => {
+  if (!input.trim()) return '';
+  
+  // Pattern to match scientific notation: number × 10^exponent or number x 10^exponent
+  // Handles: 3.1 × 10^-10, 3.1 x 10^2, 3.1*10^-10, 3.1 × 10^{-10}, etc.
+  const scientificPattern = /(-?\d+\.?\d*)\s*[×x*]\s*10\^?\{?(-?\d+)\}?/gi;
+  
+  let result = input.replace(scientificPattern, (match, coefficient, exponent) => {
+    return `${coefficient} \\times 10^{${exponent}}`;
+  });
+  
+  // If no scientific notation was found, check if there are standalone ^ notations
+  if (result === input && /\^/.test(input)) {
+    // Convert simple exponents like x^2 to x^{2}
+    result = input.replace(/\^(-?\d+)/g, '^{$1}');
+  }
+  
+  return result;
+};
+
 const QuestionCard: React.FC = () => {
   console.log('🔵 QuestionCard rendered at', new Date().toISOString());
   const [answer, setAnswer] = useState('');
+  const [formattedAnswer, setFormattedAnswer] = useState('');
+
+  const handleAnswerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAnswer(value);
+    setFormattedAnswer(convertToLatex(value));
+  };
 
   return (
     <div className="max-w-3xl mx-auto p-6 md:p-10 flex flex-col h-full overflow-y-auto">
@@ -56,7 +84,7 @@ const QuestionCard: React.FC = () => {
           <input 
             type="text"
             value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
+            onChange={handleAnswerChange}
             placeholder="Type your answer (e.g., 3.1 × 10^-10)..."
             className="
               w-full text-lg p-4 border-2 border-gray-200 rounded-xl 
@@ -67,8 +95,19 @@ const QuestionCard: React.FC = () => {
             "
           />
         </div>
+        
+        {/* Math Preview */}
+        {formattedAnswer && (
+          <div className="mt-3 p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+            <p className="text-xs font-medium text-indigo-700 mb-1">Preview:</p>
+            <div className="text-xl">
+              <MathRenderer text={`$${formattedAnswer}$`} />
+            </div>
+          </div>
+        )}
+        
         <p className="mt-2 text-xs text-gray-500">
-          Tip: You can use ^ for exponents or write in LaTeX format
+          Tip: Use × or x with 10^ for scientific notation (e.g., 3.1 × 10^-10)
         </p>
       </div>
 
@@ -78,6 +117,7 @@ const QuestionCard: React.FC = () => {
         </div>
       </div>
     </div>
+
   );
 };
 
